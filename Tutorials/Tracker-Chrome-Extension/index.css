@@ -1,0 +1,41 @@
+body {
+	margin: 0;
+	padding: 10px;
+	font-family: Arial, Helvetica;
+	min-width: 400px;
+}
+input {
+	padding: 10px;
+	width: 100%;
+	box-sizing: border-box;
+	border: 1px solid #5f9341;
+	background: white;
+	margin-bottom: 4px;
+}
+button {
+	background: #5f9341;
+	color: white;
+	padding: 10px 20px;
+	font-weight: bold;
+	border: 1px solid #5f9341;
+	/*padding-left: 20px;
+	padding-right: 20px;
+	padding-top: 10px;
+	padding-bottom: 10px;*/
+}
+#delete-btn {
+	background: white;
+	color: #5f9341;
+	border: 1px solid #5f9341;
+}
+ul {
+	list-style: none;
+	padding-left: 0;
+}
+li {
+
+}
+/*note: only "a" tags in "li" tags are affected*/
+li a {
+	color: #5f9341;
+}
