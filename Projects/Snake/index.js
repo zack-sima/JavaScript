@@ -3,6 +3,10 @@ const canvasCtx = canvas.getContext("2d");
 const title = document.getElementById("title");
 document.addEventListener("keydown", keyDown);
 
+//canvas test
+canvas.addEventListener("mousedown", doMouseDown, false);
+document.getElementById("restartButton").addEventListener("click", restart);
+
 const boardBackground = "black";
 const snakeCol = "green";
 const fruitCol = "red";
@@ -101,6 +105,11 @@ function moveSnake() {
 }
 
 //inputs
+function doMouseDown(event) {
+	//note: pageX is absolute position by document, offsetX is relative to canvas
+	//https://www.w3schools.com/jsref/obj_mouseevent.asp
+	console.log(`${event.offsetX}, ${event.offsetY}`);
+}
 function keyDown(event) {
 	const left = 37;
 	const right = 39;
