@@ -10,13 +10,6 @@ const lightTile = "#EDE7DD";
 const darkTile = "#70AF73";
 const highlightedTile = "#F2B64E";
 
-class Piece {
-	constructor(position, name, image) {
-		this.position = position;
-		this.name = name;
-		this.image = image;
-	}
-}
 class Tile {
 	constructor(position, piece) {
 		this.position = position;
@@ -54,6 +47,11 @@ const piecesLoaded = {};
 var board = new Board();
 var selectedTile = [-1, -1];
 
+//store the king positions for quick access
+const wKing = [-1, -1];
+const bKing = [-1, -1];
+let lastEnPassant = -1; //if the previous move can be en passant, set this to the rank
+
 start();
 
 function start() {
@@ -68,6 +66,15 @@ function start() {
 
 	for (i of initialPieces) {
 		board.positions[i[0]][i[1]].piece = i[2];
+
+		//king position
+		if (i[2] == "wking") {
+			wKing[0] = i[0];
+			wKing[1] = i[1];
+		} else if (i[2] == "bking") {
+			bKing[0] = i[0];
+			bKing[1] = i[1];
+		}
 	}
 
 	update();
@@ -77,6 +84,68 @@ function update() {
 
 	//30fps target
 	setTimeout(update, 30);
+}
+function moveIsLegal(piece, oldPos, newPos) {
+	console.log(`${JSON.stringify(piece)}, ${JSON.stringify(oldPos)}, ${JSON.stringify(newPos)}`);
+
+	//check for checks (no pun intended)
+	//if ()
+
+	//can't have a friendly piece on new square
+	if (board.positions[newPos[0]][newPos[1]].piece != null && board.positions[newPos[0]][newPos[1]].piece.slice(0, 1) == piece.slice(0, 1)) {
+		console.log("obstructed");
+		return false;
+	}
+
+	let pieceName = piece.slice(1);
+
+	switch (pieceName) {
+	case "knight":
+		//move two and one
+		if (Math.abs(newPos[0] - oldPos[0]) == 2 && Math.abs(newPos[1] - oldPos[1]) == 1 || Math.abs(newPos[0] - oldPos[0]) == 1 && Math.abs(newPos[1] - oldPos[1]) == 2) {
+			return true;
+		} else {
+			return false;
+		}
+		break;
+	case "rook":
+		//straight lines
+		return newPos[0] - oldPos[0] == 0 || newPos[1] - oldPos[1] == 0;
+	case "queen":
+		//straight lines or diagonals
+		return (newPos[0] - oldPos[0] == 0 || newPos[1] - oldPos[1] == 0) || (Math.abs(newPos[0] - oldPos[0]) == Math.abs(newPos[1] - oldPos[1]));
+	case "bishop":
+		return Math.abs(newPos[0] - oldPos[0]) == Math.abs(newPos[1] - oldPos[1]);
+	case "pawn":
+		//has enemy piece
+		if (board.positions[newPos[0]][newPos[1]].piece != null) {
+			//diagonal by one
+			if (piece.slice(0, 1) == "w") {
+				return newPos[1] - oldPos[1] == 1 && Math.abs(newPos[0] - oldPos[0]) == 1;
+			} else {
+				return newPos[1] - oldPos[1] == -1 && Math.abs(newPos[0] - oldPos[0]) == 1;
+			}
+		} else {
+			//en passant
+			if (lastEnPassant != -1) {
+				if (piece.slice(0, 1) == "w") {
+					if (Math.abs(newPos[0] - oldPos[0]) == 1 && oldPos[1] == 4) return true;
+				} else {
+					if (Math.abs(newPos[0] - oldPos[0]) == 1 && oldPos[1] == 3) return true;
+				}
+			}
+			//straight by one (or two if on rank 2/7)
+			if (piece.slice(0, 1) == "w") {
+				console.log(newPos[1] - oldPos[1]);
+				return newPos[0] == oldPos[0] && (newPos[1] - oldPos[1] == 1 || newPos[1] - oldPos[1] == 2 && oldPos[1] == 1);
+			} else {
+				return newPos[0] == oldPos[0] && (newPos[1] - oldPos[1] == -1 || newPos[1] - oldPos[1] == -2 && oldPos[1] == 6);
+			}
+		}
+	}
+
+
+	return true;
 }
 function drawBoard() {
 	for (let i = 0; i < 8; i++) {
@@ -92,7 +161,7 @@ function drawBoard() {
 			}
 			canvasCtx.fillRect(i * 50, 350 - j * 50, 50, 50);
 
-			//add pieces (temporary king)
+			//draw pieces
 			if (board.positions[i][j].piece != null && board.positions[i][j].piece in piecesLoaded) {
 				canvasCtx.drawImage(piecesLoaded[board.positions[i][j].piece], i * 50, 350 - j * 50, 50, 50);
 			}
@@ -106,11 +175,46 @@ function mouseDown(event) {
 	let y = Math.floor(event.offsetY / 50);
 
 	if (selectedTile[0] != x || selectedTile[1] != y) {
-		//select tile=
-		if (selectedTile[0] != -1 && selectedTile[1] != -1 && board.positions[selectedTile[0]][7 - selectedTile[1]].piece != null) {
-			board.positions[x][7 - y].piece = board.positions[selectedTile[0]][7 - selectedTile[1]].piece
-			board.positions[selectedTile[0]][7 - selectedTile[1]].piece = null;
-			console.log("movepiece");
+		let newTile = board.positions[x][7 - y];
+
+		let oldTile = null;
+		if (selectedTile[0] != -1 && selectedTile[1] != -1) {
+			oldTile = board.positions[selectedTile[0]][7 - selectedTile[1]];
+		}
+
+		//if selectedTile is not null and piece has been clicked
+		if (selectedTile[0] != -1 && selectedTile[1] != -1 && oldTile.piece != null && moveIsLegal(oldTile.piece, [selectedTile[0], 7 - selectedTile[1]], [x, 7 - y])) {
+
+			//remove en passanted pawn if pawn made capture move on empty square
+			if (newTile.piece == null && selectedTile[0] != x) {
+				if (oldTile.piece == "wpawn") {
+					//removes black pawn
+					board.positions[x][4].piece = null;
+				} else if (oldTile.piece == "bpawn") {
+					//removes white pawn
+					board.positions[x][3].piece = null;
+				}
+			}
+
+			newTile.piece = board.positions[selectedTile[0]][7 - selectedTile[1]].piece;
+
+			//update king position if king
+			if (newTile.piece == "wking") {
+				wKing[0] = x;
+				wKing[1] = y;
+			} else if (newTile.piece == "bking") {
+				bKing[0] = x;
+				bKing[1] = y;
+			}
+
+			//update en passant if applicable otherwise set to false
+			if (newTile.piece.slice(1) == "pawn" && Math.abs(selectedTile[1] - y) == 2) {
+				lastEnPassant = x;
+			} else {
+				lastEnPassant = -1;
+			}
+
+			oldTile.piece = null;
 
 			selectedTile = [-1, -1];
 		} else {
