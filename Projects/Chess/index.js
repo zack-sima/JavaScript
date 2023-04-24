@@ -50,7 +50,11 @@ var selectedTile = [-1, -1];
 //store the king positions for quick access
 const wKing = [-1, -1];
 const bKing = [-1, -1];
-let lastEnPassant = -1; //if the previous move can be en passant, set this to the rank
+const lastEnPassant = [-1, "w"]; //if the previous move can be en passant, set this to position
+
+//if king moves, both will be set to false; if one rook moves one will be set to false
+const whiteCastles = [true, true];
+const blackCastles = [true, true];
 
 start();
 
@@ -85,11 +89,126 @@ function update() {
 	//30fps target
 	setTimeout(update, 30);
 }
+
+//integer interpolation between a and b where index is added to the first value
+function interpolate(a, b, index) {
+	if (a > b) return a - index;
+	return a + index;
+}
+
+//moves the piece into given new position and reverts changes after evaluation
+function kingInCheck(piece, oldPos, newPos) {
+	let kingPos = [-1, -1];
+	let playerColor = piece.slice(0, 1);
+	if (piece.slice(1) == "king") {
+		kingPos = newPos;
+	} else {
+		if (playerColor == "w") {
+			kingPos = wKing;
+		} else {
+			kingPos = bKing;
+		}
+	}
+	console.log(`${playerColor}king: ${kingPos[0]}, ${kingPos[1]}`);
+
+	let knightChecks = [[1, 2], [2, 1], [-1, 2], [-2, 1], [-1, -2], [-2, -1], [1, -2], [2, -1]];
+	for (let i of knightChecks) {
+		//legal position
+		if (kingPos[0] + i[0] >= 0 && kingPos[0] + i[0] <= 7 && kingPos[1] + i[1] >= 0 && kingPos[1] + i[1] <= 7) {
+			let piece = board.positions[kingPos[0] + i[0]][kingPos[1] + i[1]].piece;
+			if (piece != null && piece.slice(0, 1) != playerColor && piece.slice(1) == "knight") {
+				console.log("knight checking!");
+				return true;
+			}
+		}
+	}
+
+	let diagonalChecks = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
+	for (let i of diagonalChecks) {
+		//j is the diagonal multiplier
+		for (let j = 1; kingPos[0] + i[0] * j >= 0 && kingPos[0] + i[0] * j <= 7 && kingPos[1] + i[1] * j >= 0 && kingPos[1] + i[1] * j <= 7; j++) {
+			//old position skipped
+			if (oldPos[0] == kingPos[0] + i[0] * j && oldPos[1] == kingPos[1] + i[1] * j) continue;
+
+			let piece = board.positions[kingPos[0] + i[0] * j][kingPos[1] + i[1] * j].piece;
+			if (piece != null) {
+				let pieceColor = piece.slice(0, 1);
+				let pieceName = piece.slice(1);
+
+				//friendly piece blocks diagonal
+				if (pieceColor == playerColor) break;
+				//rooks and knights can't attack diagonals
+				if (pieceName == "rook" || pieceName == "knight") break;
+				//queens and bishops always will check
+				if (pieceName == "queen" || pieceName == "bishop") {
+					console.log("diagonal checked!");
+					return true;
+				}
+				//enemy king checks if one away
+				if (pieceName == "king") {
+					if (j == 1) {
+						console.log(`enemy ${piece} check! at ${kingPos[0] + i[0] * j}, ${kingPos[1] + i[1] * j}`);
+						return true;
+					} else {
+						break;
+					}
+				}
+				if (pieceName == "pawn") {
+					//pawn attacking
+					if (j == 1 && (i[1] == 1 && pieceColor == "b" || i[1] == -1 && pieceColor == "w")) {
+						console.log("pawn check!");
+						return true;
+					} else {
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	let straightChecks = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+	for (let i of straightChecks) {
+		//j is the vertical/horizontal multiplier
+		for (let j = 1; kingPos[0] + i[0] * j >= 0 && kingPos[0] + i[0] * j <= 7 && kingPos[1] + i[1] * j >= 0 && kingPos[1] + i[1] * j <= 7; j++) {
+			//old position skipped
+			if (oldPos[0] == kingPos[0] + i[0] * j && oldPos[1] == kingPos[1] + i[1] * j) continue;
+
+			let piece = board.positions[kingPos[0] + i[0] * j][kingPos[1] + i[1] * j].piece;
+			if (piece != null) {
+				let pieceColor = piece.slice(0, 1);
+				let pieceName = piece.slice(1);
+
+				//friendly piece blocks line
+				if (pieceColor == playerColor) break;
+				//bishops, knights, and pawns can't attack lines
+				if (pieceName == "bishop" || pieceName == "knight" || pieceName == "pawn") break;
+				//queens and rooks always will check
+				if (pieceName == "queen" || pieceName == "rook") {
+					console.log("vertical/horizontal checked!");
+					return true;
+				}
+				//enemy king checks if one away
+				if (pieceName == "king") {
+					if (j == 1) {
+						console.log("enemy king check!");
+						return true;
+					} else {
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	return false;
+}
 function moveIsLegal(piece, oldPos, newPos) {
 	console.log(`${JSON.stringify(piece)}, ${JSON.stringify(oldPos)}, ${JSON.stringify(newPos)}`);
 
 	//check for checks (no pun intended)
-	//if ()
+	if (kingInCheck(piece, oldPos, newPos)) {
+		return false;
+	}
 
 	//can't have a friendly piece on new square
 	if (board.positions[newPos[0]][newPos[1]].piece != null && board.positions[newPos[0]][newPos[1]].piece.slice(0, 1) == piece.slice(0, 1)) {
@@ -110,12 +229,93 @@ function moveIsLegal(piece, oldPos, newPos) {
 		break;
 	case "rook":
 		//straight lines
-		return newPos[0] - oldPos[0] == 0 || newPos[1] - oldPos[1] == 0;
+		if (newPos[0] - oldPos[0] == 0 || newPos[1] - oldPos[1] == 0) {
+			if (newPos[0] - oldPos[0] == 0) {
+				for (let i = Math.min(newPos[1], oldPos[1]) + 1; i < Math.max(newPos[1], oldPos[1]); i++) {
+					if (board.positions[newPos[0]][i].piece != null) {
+						return false;
+					}
+				}
+				return true;
+			} else {
+				for (let i = Math.min(newPos[0], oldPos[0]) + 1; i < Math.max(newPos[0], oldPos[0]); i++) {
+					if (board.positions[i][newPos[1]].piece != null) {
+						return false;
+					}
+				}
+				return true;
+			}
+		}
+		return false;
 	case "queen":
-		//straight lines or diagonals
-		return (newPos[0] - oldPos[0] == 0 || newPos[1] - oldPos[1] == 0) || (Math.abs(newPos[0] - oldPos[0]) == Math.abs(newPos[1] - oldPos[1]));
+		//straight lines
+		if (newPos[0] - oldPos[0] == 0 || newPos[1] - oldPos[1] == 0) {
+			if (newPos[0] - oldPos[0] == 0) {
+				for (let i = Math.min(newPos[1], oldPos[1]) + 1; i < Math.max(newPos[1], oldPos[1]); i++) {
+					if (board.positions[newPos[0]][i].piece != null) {
+						return false;
+					}
+				}
+				return true;
+			} else {
+				for (let i = Math.min(newPos[0], oldPos[0]) + 1; i < Math.max(newPos[0], oldPos[0]); i++) {
+					if (board.positions[i][newPos[1]].piece != null) {
+						return false;
+					}
+				}
+				return true;
+			}
+		}
+
+		//diagonals
+		if (Math.abs(newPos[0] - oldPos[0]) == Math.abs(newPos[1] - oldPos[1])) {
+			if (Math.abs(newPos[0] - oldPos[0]) == Math.abs(newPos[1] - oldPos[1])) {
+				for (let i = 1; i < Math.abs(newPos[1] - oldPos[1]); i++) {
+					if (board.positions[interpolate(oldPos[0], newPos[0], i)][interpolate(oldPos[1], newPos[1], i)].piece != null) {
+						return false;
+					}
+				}
+				return true;
+			}
+		}
+
+		return false;
+	case "king":
+		//king side castling
+		if (piece == "wking" && whiteCastles[1] && oldPos[1] == 0 && oldPos[0] == 4 && newPos[1] == 0 && newPos[0] == 6) {
+			if (!kingInCheck(piece, wKing, wKing) && !kingInCheck(piece, wKing, [wKing[0] + 1, wKing[1]]) && !kingInCheck(piece, wKing, [wKing[0] + 2, wKing[1]])) {
+				return true;
+			}
+		}
+		//queen side castling
+		if (piece == "wking" && whiteCastles[0] && oldPos[1] == 0 && oldPos[0] == 4 && newPos[1] == 0 && newPos[0] == 2) {
+			if (!kingInCheck(piece, wKing, wKing) && !kingInCheck(piece, wKing, [wKing[0] - 1, wKing[1]]) && !kingInCheck(piece, wKing, [wKing[0] - 2, wKing[1]])) {
+				return true;
+			}
+		}
+		//king side castling
+		if (piece == "bking" && blackCastles[1] && oldPos[1] == 7 && oldPos[0] == 4 && newPos[1] == 7 && newPos[0] == 6) {
+			if (!kingInCheck(piece, bKing, bKing) && !kingInCheck(piece, bKing, [bKing[0] + 1, bKing[1]]) && !kingInCheck(piece, bKing, [bKing[0] + 2, bKing[1]])) {
+				return true;
+			}
+		}
+		//queen side castling
+		if (piece == "bking" && blackCastles[0] && oldPos[1] == 7 && oldPos[0] == 4 && newPos[1] == 7 && newPos[0] == 2) {
+			if (!kingInCheck(piece, bKing, bKing) && !kingInCheck(piece, bKing, [bKing[0] - 1, bKing[1]]) && !kingInCheck(piece, bKing, [bKing[0] - 2, bKing[1]])) {
+				return true;
+			}
+		}
+		return Math.abs(newPos[0] - oldPos[0]) <= 1 && Math.abs(newPos[1] - oldPos[1]) <= 1;
 	case "bishop":
-		return Math.abs(newPos[0] - oldPos[0]) == Math.abs(newPos[1] - oldPos[1]);
+		if (Math.abs(newPos[0] - oldPos[0]) == Math.abs(newPos[1] - oldPos[1])) {
+			for (let i = 1; i < Math.abs(newPos[1] - oldPos[1]); i++) {
+				if (board.positions[interpolate(oldPos[0], newPos[0], i)][interpolate(oldPos[1], newPos[1], i)].piece != null) {
+					return false;
+				}
+			}
+			return true;
+		}
+		return false;
 	case "pawn":
 		//has enemy piece
 		if (board.positions[newPos[0]][newPos[1]].piece != null) {
@@ -127,16 +327,15 @@ function moveIsLegal(piece, oldPos, newPos) {
 			}
 		} else {
 			//en passant
-			if (lastEnPassant != -1) {
+			if (lastEnPassant[0] != -1) {
 				if (piece.slice(0, 1) == "w") {
-					if (Math.abs(newPos[0] - oldPos[0]) == 1 && oldPos[1] == 4) return true;
+					if (Math.abs(newPos[0] - oldPos[0]) == 1 && oldPos[1] == 4 && lastEnPassant[1] == "b") return true;
 				} else {
-					if (Math.abs(newPos[0] - oldPos[0]) == 1 && oldPos[1] == 3) return true;
+					if (Math.abs(newPos[0] - oldPos[0]) == 1 && oldPos[1] == 3 && lastEnPassant[1] == "w") return true;
 				}
 			}
 			//straight by one (or two if on rank 2/7)
 			if (piece.slice(0, 1) == "w") {
-				console.log(newPos[1] - oldPos[1]);
 				return newPos[0] == oldPos[0] && (newPos[1] - oldPos[1] == 1 || newPos[1] - oldPos[1] == 2 && oldPos[1] == 1);
 			} else {
 				return newPos[0] == oldPos[0] && (newPos[1] - oldPos[1] == -1 || newPos[1] - oldPos[1] == -2 && oldPos[1] == 6);
@@ -201,17 +400,52 @@ function mouseDown(event) {
 			//update king position if king
 			if (newTile.piece == "wking") {
 				wKing[0] = x;
-				wKing[1] = y;
+				wKing[1] = 7 - y;
+
+				whiteCastles[0] = false;
+				whiteCastles[1] = false;
+
+				//castling
+				if (oldTile.position[0] == 4 && oldTile.position[1] == 0 && newTile.position[0] == 6 && newTile.position[1] == 0) {
+					board.positions[5][0].piece = "wrook";
+					board.positions[7][0].piece = null;
+				} else if (oldTile.position[0] == 4 && oldTile.position[1] == 0 && newTile.position[0] == 2 && newTile.position[1] == 0) {
+					board.positions[3][0].piece = "wrook";
+					board.positions[0][0].piece = null;
+				}
 			} else if (newTile.piece == "bking") {
 				bKing[0] = x;
-				bKing[1] = y;
+				bKing[1] = 7 - y;
+
+				blackCastles[0] = false;
+				blackCastles[1] = false;
+
+				//castling
+				if (oldTile.position[0] == 4 && oldTile.position[1] == 7 && newTile.position[0] == 6 && newTile.position[1] == 7) {
+					board.positions[5][7].piece = "brook";
+					board.positions[7][7].piece = null;
+				} else if (oldTile.position[0] == 4 && oldTile.position[1] == 7 && newTile.position[0] == 2 && newTile.position[1] == 7) {
+					board.positions[3][7].piece = "brook";
+					board.positions[0][7].piece = null;
+				}
+			}
+			//remove castling
+			if (newTile.piece == "wrook" && oldTile.position[0] == 0 && oldTile.position[1] == 0) {
+				whiteCastles[0] = false;
+			} else if (newTile.piece == "wrook" && oldTile.position[0] == 7 && oldTile.position[1] == 0) {
+				whiteCastles[1] = false;
+			} else if (newTile.piece == "brook" && oldTile.position[0] == 0 && oldTile.position[1] == 7) {
+				whiteCastles[0] = false;
+			} else if (newTile.piece == "brook" && oldTile.position[0] == 7 && oldTile.position[1] == 7) {
+				whiteCastles[1] = false;
 			}
 
 			//update en passant if applicable otherwise set to false
 			if (newTile.piece.slice(1) == "pawn" && Math.abs(selectedTile[1] - y) == 2) {
-				lastEnPassant = x;
+				lastEnPassant[0] = x;
+				lastEnPassant[1] = newTile.piece.slice(0, 1);
 			} else {
-				lastEnPassant = -1;
+				lastEnPassant[0] = -1;
 			}
 
 			oldTile.piece = null;
