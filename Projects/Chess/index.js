@@ -113,6 +113,9 @@ function kingInCheck(piece, oldPos, newPos) {
 
 	let knightChecks = [[1, 2], [2, 1], [-1, 2], [-2, 1], [-1, -2], [-2, -1], [1, -2], [2, -1]];
 	for (let i of knightChecks) {
+		//new position skipped
+		if (newPos[0] == kingPos[0] + i[0] && newPos[1] == kingPos[1] + i[1]) continue;
+
 		//legal position
 		if (kingPos[0] + i[0] >= 0 && kingPos[0] + i[0] <= 7 && kingPos[1] + i[1] >= 0 && kingPos[1] + i[1] <= 7) {
 			let piece = board.positions[kingPos[0] + i[0]][kingPos[1] + i[1]].piece;
@@ -129,6 +132,9 @@ function kingInCheck(piece, oldPos, newPos) {
 		for (let j = 1; kingPos[0] + i[0] * j >= 0 && kingPos[0] + i[0] * j <= 7 && kingPos[1] + i[1] * j >= 0 && kingPos[1] + i[1] * j <= 7; j++) {
 			//old position skipped
 			if (oldPos[0] == kingPos[0] + i[0] * j && oldPos[1] == kingPos[1] + i[1] * j) continue;
+
+			//new position blocks
+			if (newPos[0] == kingPos[0] + i[0] * j && newPos[1] == kingPos[1] + i[1] * j) break;
 
 			let piece = board.positions[kingPos[0] + i[0] * j][kingPos[1] + i[1] * j].piece;
 			if (piece != null) {
@@ -172,6 +178,9 @@ function kingInCheck(piece, oldPos, newPos) {
 		for (let j = 1; kingPos[0] + i[0] * j >= 0 && kingPos[0] + i[0] * j <= 7 && kingPos[1] + i[1] * j >= 0 && kingPos[1] + i[1] * j <= 7; j++) {
 			//old position skipped
 			if (oldPos[0] == kingPos[0] + i[0] * j && oldPos[1] == kingPos[1] + i[1] * j) continue;
+
+			//new position blocks
+			if (newPos[0] == kingPos[0] + i[0] * j && newPos[1] == kingPos[1] + i[1] * j) break;
 
 			let piece = board.positions[kingPos[0] + i[0] * j][kingPos[1] + i[1] * j].piece;
 			if (piece != null) {
@@ -283,25 +292,25 @@ function moveIsLegal(piece, oldPos, newPos) {
 	case "king":
 		//king side castling
 		if (piece == "wking" && whiteCastles[1] && oldPos[1] == 0 && oldPos[0] == 4 && newPos[1] == 0 && newPos[0] == 6) {
-			if (!kingInCheck(piece, wKing, wKing) && !kingInCheck(piece, wKing, [wKing[0] + 1, wKing[1]]) && !kingInCheck(piece, wKing, [wKing[0] + 2, wKing[1]])) {
+			if (board.positions[wKing[0] + 1][wKing[1]].piece == null && board.positions[wKing[0] + 2][wKing[1]].piece == null && !kingInCheck(piece, wKing, wKing) && !kingInCheck(piece, wKing, [wKing[0] + 1, wKing[1]]) && !kingInCheck(piece, wKing, [wKing[0] + 2, wKing[1]])) {
 				return true;
 			}
 		}
 		//queen side castling
 		if (piece == "wking" && whiteCastles[0] && oldPos[1] == 0 && oldPos[0] == 4 && newPos[1] == 0 && newPos[0] == 2) {
-			if (!kingInCheck(piece, wKing, wKing) && !kingInCheck(piece, wKing, [wKing[0] - 1, wKing[1]]) && !kingInCheck(piece, wKing, [wKing[0] - 2, wKing[1]])) {
+			if (board.positions[wKing[0] - 1][wKing[1]].piece == null && board.positions[wKing[0] - 2][wKing[1]].piece == null && board.positions[wKing[0] - 3][wKing[1]].piece == null && !kingInCheck(piece, wKing, wKing) && !kingInCheck(piece, wKing, [wKing[0] - 1, wKing[1]]) && !kingInCheck(piece, wKing, [wKing[0] - 2, wKing[1]])) {
 				return true;
 			}
 		}
 		//king side castling
 		if (piece == "bking" && blackCastles[1] && oldPos[1] == 7 && oldPos[0] == 4 && newPos[1] == 7 && newPos[0] == 6) {
-			if (!kingInCheck(piece, bKing, bKing) && !kingInCheck(piece, bKing, [bKing[0] + 1, bKing[1]]) && !kingInCheck(piece, bKing, [bKing[0] + 2, bKing[1]])) {
+			if (board.positions[bKing[0] + 1][bKing[1]].piece == null && board.positions[bKing[0] + 2][bKing[1]].piece == null && !kingInCheck(piece, bKing, bKing) && !kingInCheck(piece, bKing, [bKing[0] + 1, bKing[1]]) && !kingInCheck(piece, bKing, [bKing[0] + 2, bKing[1]])) {
 				return true;
 			}
 		}
 		//queen side castling
 		if (piece == "bking" && blackCastles[0] && oldPos[1] == 7 && oldPos[0] == 4 && newPos[1] == 7 && newPos[0] == 2) {
-			if (!kingInCheck(piece, bKing, bKing) && !kingInCheck(piece, bKing, [bKing[0] - 1, bKing[1]]) && !kingInCheck(piece, bKing, [bKing[0] - 2, bKing[1]])) {
+			if (board.positions[bKing[0] - 1][bKing[1]].piece == null && board.positions[bKing[0] - 2][bKing[1]].piece == null && board.positions[bKing[0] - 3][bKing[1]].piece == null && !kingInCheck(piece, bKing, bKing) && !kingInCheck(piece, bKing, [bKing[0] - 1, bKing[1]]) && !kingInCheck(piece, bKing, [bKing[0] - 2, bKing[1]])) {
 				return true;
 			}
 		}
