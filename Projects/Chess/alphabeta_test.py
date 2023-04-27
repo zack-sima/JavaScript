@@ -46,7 +46,7 @@ tree = Node(0, left_index=0, right_index=len(tree_arr) - 1)
 tree.create_children()
 #tree.display_depth_first()
 
-#minimax
+#minimax without pruning
 def minimax(node, maximizing):
 	if len(node.children) == 0:
 		return tree_arr[node.left_index]
